@@ -1,0 +1,3 @@
+---
+- import_playbook: ./playbooks/frontend.yaml
+  when: ansible_role == "frontend"

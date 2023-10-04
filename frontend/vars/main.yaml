@@ -1,0 +1,14 @@
+---
+packages:
+  - wget
+  - unzip
+  - curl
+  - git
+  - jq
+  - apache2
+  - mysql-client
+  - php
+users:
+  - apple
+  - banana
+  - carrot
