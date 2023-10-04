@@ -43,7 +43,7 @@
 
 - name: download zip from S3
   amazon.aws.aws_s3:
-    bucket: skillup-s3-aa.achico-001
+    bucket: skillup-s3-mj.salceda
     mode: get
     object: frontend.zip
     dest: "/tmp/fefiles/frontend.zip"
