@@ -1,0 +1,131 @@
+pipeline {
+    agent {
+        node "${params.BUILD_NODE}"
+    }
+    options {
+        timestamps()
+        skipDefaultCheckout(true)
+    }
+    parameters {
+        string (
+            name: "BUILD_NODE",
+            defaultValue: "Main",
+            description: "Node to perform project build (default Earth)"
+        )
+        string (
+            name : "BUILD_NUMBER",
+            defaultValue: "1",
+            description: "Build number to check"
+        )
+    }
+    environment {
+        MODULE = "SOSHUB"
+
+        //## ################################################## ##
+        //CHECKOUT
+
+        GITHUB_URL = "https://github.sec.samsung.net"
+
+        //MODULE
+        GITHUB_CREDS = "github.sec.samsung.net" //QA Corporate GitHub creds
+        GITHUB_BASE_URL = "${GITHUB_URL}/SOSHUB"
+        MODULE_DIR = 'be-soshub'
+
+        //## ################################################## ##
+        //BUILD
+
+        //Docker
+        DOCKER_CREDS = "2f31ea60-db03-4091-b922-9dac2f4ef77c" //QA Docker Harbor creds
+
+        ARTIFACTORY_USER_NAME = 'aj.garcia' //  CHANGE TO YOUR OWN USER
+        ARTIFACTORY_API_KEY = credentials('ARTIFACTORY_API_KEY')
+
+        DOCKER_REGISTRY = "soshub-docker-local.bart.sec.samsung.net"
+        DOCKER_PROJECT = "os"
+
+        DOCKER_IMG_NAME = "osts_fast_tracking"
+        DOCKER_IMG_TAG = "latest"
+        DOCKER_IMG = "${DOCKER_REGISTRY}/${DOCKER_IMG_NAME}:${DOCKER_IMG_TAG}"
+        DOCKER_SHARED_FOLDER = "/mnt/storage/osts/"
+        DOCKER_IMG_ARGS = "-u root -v ${DOCKER_SHARED_FOLDER}:/osts"
+
+        // mySingle Creds
+        MYSINGLE_CREDS = "59ad1f47-b773-4139-b920-ad18744745e2"
+        OSTS_DB_ON_MARS_USER = "40952a0a-3d3c-4f5f-a2d2-9fcf42421c8f"
+        OSTS_DB_ON_MARS_ROOT = "5fb90a5a-3889-4110-877c-dbe8e215581e"
+        OSTS_DB_ON_MARS_USER_PASS = credentials('daa7908e-5fbb-4aab-b3f2-7a896a13ecb9')
+
+        //## ################################################## ##
+        //POST_ACTIONS
+
+        //e-mail
+        MAIL_TO = "o.konoval@samsung.com,k.motora@samsung.com,aj.garcia@samsung.com"
+        MAIL_SUBJECT = "Job ${JOB_NAME}. Build # ${BUILD_NUMBER}: "
+        MAIL_BODY_TOP = "Result: "
+        MAIL_BODY_BOTTOM = ". Build details: ${BUILD_URL}"
+    }
+    stages {
+        stage("Clean workspace") {
+            steps {
+                cleanWs()
+            }
+        }
+        stage("Checkout scm") {
+            steps {
+                echo "## ################################################## ##"
+                echo "Checkout ${MODULE} from BRANCH == ${params.MODULE_BRANCH} into: NODE == ${params.BUILD_NODE} | WORKSPACE == ${WORKSPACE}"
+                checkout([
+                    $class: "GitSCM",
+                    // doGenerateSubmoduleConfigurations: false,
+                    // submoduleCfg: [],
+                    userRemoteConfigs: [[
+                        // credentialsId: "${GITHUB_CREDS}",
+                        url: "git@github.sec.samsung.net:SOSHUB/SOSHUB.git"
+                    ]],
+                    branches: [[
+                        name: "*/${params.MODULE_BRANCH}"
+                    ]],
+                    extensions: [[$class: 'CloneOption', timeout: 120, noTags: false]]
+                    // extensions: [[
+                    //     $class: "RelativeTargetDirectory",
+                    //     relativeTargetDir: "${MODULE_DIR}",
+                    //     noTags: false,
+                    //     timeout: 120
+                    // ]]
+                ])
+
+                echo "Check directory ${MODULE_DIR} content"
+                sh "ls -la"
+            }
+        }
+        stage("Get error log") {
+            steps {
+                sh "docker exec 6467e798c4c4 cat ${JENKINS_HOME}/jobs/azure_osts/jobs/azure_osts_crawler/builds/${BUILD_NUMBER}/log > ${BUILD_NUMBER}_log.txt"
+                if[ ! -s '${BUILD_NUMBER}_log.txt' ]; then rm -rf ${BUILD_NUMBER}_log.txt;fi;
+                    
+                }
+            }
+        }
+      
+    }
+    post {
+        always {
+            echo "## ################################################## ##"
+            echo "Check directory ${MODULE_DIR} content"
+            // sh "ls -la ${MODULE_DIR}"
+
+            echo "e-mail results"
+            // mail to: "${MAIL_TO}",
+            // subject: "${MAIL_SUBJECT}${currentBuild.currentResult}",
+            // body: "${MAIL_BODY_TOP}${currentBuild.currentResult}${MAIL_BODY_BOTTOM}"
+        }
+        success {
+            echo "## ################################################## ##"
+            echo "Job STATUS == SUCCESS"
+        }
+        failure {
+            echo "## ################################################## ##"
+            echo "Job STATUS == FAILURE"
+        }
+    }
+}
